@@ -86,7 +86,7 @@ export default function FrequencySpectrum({ analyserNode, chartType, isExpanded,
   }, [analyserNode, chartType, zoomLevel])
 
   return (
-    <Card className={`${isExpanded ? 'col-span-3' : ''} flex flex-col`}>
+    <Card className={`${isExpanded ? 'md:col-span-2 lg:col-span-3' : ''} flex flex-col`}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium">Espectro de Frecuencia</CardTitle>
         <div className="flex gap-2">

@@ -1,6 +1,6 @@
 import { useRef, useEffect, useState } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 import { Maximize2, Minimize2, ZoomIn, ZoomOut } from 'lucide-react'
 
 interface AudioVisualizerProps {
@@ -83,7 +83,7 @@ export default function AudioVisualizer({
   }, [analyserNode, zoomLevel, onMaxValueChange])
 
   return (
-    <Card className={`${isExpanded ? 'col-span-3' : ''} flex flex-col`}>
+    <Card className={`${isExpanded ? 'md:col-span-2 lg:col-span-3' : ''} flex flex-col`}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium">Señal de Audio en Tiempo Real</CardTitle>
         <div className="flex gap-2">

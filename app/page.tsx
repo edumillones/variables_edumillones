@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -26,21 +26,30 @@ export default function Page() {
   const [autoDetectAnomalies, setAutoDetectAnomalies] = useState(true)
   const mediaStreamRef = useRef<MediaStream | null>(null)
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null)
+  const isMountedRef = useRef(true)
 
-  // Initialize audio context when component mounts
   useEffect(() => {
-    // Create audio context only on user interaction
+    return () => {
+      isMountedRef.current = false
+    }
+  }, [])
+
+  useEffect(() => {
     const initAudio = () => {
       if (!audioContext) {
-        const newAudioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
-        setAudioContext(newAudioContext)
-        const newAnalyserNode = newAudioContext.createAnalyser()
-        newAnalyserNode.fftSize = 2048
-        setAnalyserNode(newAnalyserNode)
+        try {
+          const newAudioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
+          setAudioContext(newAudioContext)
+          const newAnalyserNode = newAudioContext.createAnalyser()
+          newAnalyserNode.fftSize = 2048
+          setAnalyserNode(newAnalyserNode)
+        } catch (error) {
+          console.error('Failed to initialize audio context:', error)
+          addEvent('Error al inicializar el contexto de audio', 'SYS-01', 'Sistema de Audio')
+        }
       }
     }
 
-    // Add event listener for user interaction
     window.addEventListener('click', initAudio, { once: true })
 
     return () => {
@@ -57,7 +66,10 @@ export default function Page() {
         throw new Error('Audio context not initialized')
       }
 
-      // Request microphone access
+      if (audioContext.state === 'suspended') {
+        await audioContext.resume()
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
           echoCancellation: true,
@@ -66,23 +78,15 @@ export default function Page() {
         } 
       })
       
-      // Store the stream reference
       mediaStreamRef.current = stream
 
-      // Create and store the source node
       const source = audioContext.createMediaStreamSource(stream)
       sourceRef.current = source
 
-      // Connect the audio graph
       source.connect(analyserNode)
       
       setIsRecording(true)
       addEvent('Grabación iniciada', 'MIC-01', 'Micrófono Principal')
-      
-      // Resume audio context if it's suspended
-      if (audioContext.state === 'suspended') {
-        await audioContext.resume()
-      }
     } catch (error) {
       console.error('Error accessing microphone:', error)
       addEvent('Error al iniciar la grabación', 'MIC-01', 'Micrófono Principal')
@@ -91,10 +95,8 @@ export default function Page() {
 
   const stopRecording = () => {
     if (mediaStreamRef.current) {
-      // Stop all tracks in the stream
       mediaStreamRef.current.getTracks().forEach(track => track.stop())
       
-      // Disconnect the source if it exists
       if (sourceRef.current) {
         sourceRef.current.disconnect()
         sourceRef.current = null
@@ -110,31 +112,33 @@ export default function Page() {
     setExpandedChart(expandedChart === chartId ? null : chartId)
   }
 
-  const addEvent = (message: string, machine: string, machineName: string) => {
-    const newEvent = {
-      timestamp: new Date().toLocaleString(),
-      message,
-      machine,
-      machineName
+  const addEvent = useCallback((message: string, machine: string, machineName: string) => {
+    if (isMountedRef.current) {
+      setEvents(prevEvents => [{
+        timestamp: new Date().toLocaleString(),
+        message,
+        machine,
+        machineName
+      }, ...prevEvents])
     }
-    setEvents(prevEvents => [newEvent, ...prevEvents])
-  }
+  }, [])
 
-  const handleMaxValueChange = (maxValue: number) => {
-    if (maxValue >= 1.6) {
-      setProcessState('irregular')
-      addEvent('Señal irregular detectada', 'PROC-01', 'Procesador de Señales')
-    } else {
-      setProcessState('normal')
+  const handleMaxValueChange = useCallback((maxValue: number) => {
+    if (isMountedRef.current) {
+      if (maxValue >= 1.6) {
+        setProcessState('irregular')
+        addEvent('Señal irregular detectada', 'PROC-01', 'Procesador de Señales')
+      } else {
+        setProcessState('normal')
+      }
     }
-  }
+  }, [addEvent])
 
   const exportResults = () => {
     console.log('Exportando resultados...')
     addEvent('Resultados exportados', 'EXP-01', 'Módulo de Exportación')
   }
 
-  // Clean up audio resources when component unmounts
   useEffect(() => {
     return () => {
       stopRecording()
@@ -145,25 +149,37 @@ export default function Page() {
   }, [])
 
   return (
-    <div className="container mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-4">Incidencia de las señales acústicas en el sistema auditivo y su análisis mediante Transformada de Fourier</h1>
+    <div className="container mx-auto p-2 sm:p-4 pt-8">
+      <div className="mt-8 mb-8">
+        <h1 className="text-4xl font-bold mb-4 bg-gradient-to-r from-purple-600 via-pink-500 to-indigo-400 bg-clip-text text-transparent">
+          Incidencia de las señales acústicas en el sistema auditivo y su análisis mediante Transformada de Fourier
+        </h1>
+        <a 
+          href="https://docs.google.com/document/d/1wVy2BIcuZvtLJzLFU3NgGFW2aayAv1kvD2sGd_fP19k/edit?usp=sharing" 
+          target="_blank" 
+          rel="noopener noreferrer" 
+          className="text-blue-500 hover:text-blue-700 transition-colors duration-200"
+        >
+          Ver Informe de Investigación
+        </a>
+      </div>
       <div className="grid gap-4 mb-4">
         <Card>
           <CardHeader>
             <CardTitle>Configuración</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-center space-x-4">
-              <Button onClick={isRecording ? stopRecording : startRecording}>
+            <div className="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-4">
+              <Button onClick={isRecording ? stopRecording : startRecording} className="w-full sm:w-auto">
                 <Mic className="mr-2 h-4 w-4" />
                 {isRecording ? 'Detener Grabación' : 'Iniciar Grabación'}
               </Button>
-              <Button onClick={exportResults}>
+              <Button onClick={exportResults} className="w-full sm:w-auto">
                 <Download className="mr-2 h-4 w-4" />
                 Exportar Resultados
               </Button>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="chart-type">Tipo de Gráfico</Label>
                 <Select value={chartType} onValueChange={(value: 'line' | 'bar') => setChartType(value)}>
@@ -200,7 +216,7 @@ export default function Page() {
         </Card>
         <ProcessStatus state={processState} />
       </div>
-      <div className="grid grid-cols-3 gap-4 mb-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
         <AudioVisualizer
           analyserNode={analyserNode}
           chartType={chartType}
@@ -222,8 +238,10 @@ export default function Page() {
         />
       </div>
       <EventLog events={events} />
-      <footer className="mt-8 text-center text-sm text-gray-500">
-        <a href="https://edumillones.vercel.app/" className="hover:underline">by @edu.millones</a>
+      <footer className="mt-8 text-center text-sm">
+        <a href="https://edumillones.vercel.app/" className="bg-gradient-to-r from-purple-400 to-pink-300 bg-clip-text text-transparent hover:from-purple-500 hover:to-pink-400 transition-all duration-300">
+          by @edu.millones
+        </a>
       </footer>
     </div>
   )

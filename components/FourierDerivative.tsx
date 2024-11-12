@@ -79,7 +79,7 @@ export default function FourierDerivative({ analyserNode, chartType, isExpanded,
   }, [analyserNode, zoomLevel])
 
   return (
-    <Card className={`${isExpanded ? 'col-span-3' : ''} flex flex-col`}>
+    <Card className={`${isExpanded ? 'md:col-span-2 lg:col-span-3' : ''} flex flex-col`}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium">Derivada de Fourier</CardTitle>
         <div className="flex gap-2">
